@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Employee;
 use App\Models\Division;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class EmployeeController extends Controller
 {
@@ -40,6 +41,8 @@ class EmployeeController extends Controller
 
     public function store(Request $request)
     {
+        Log::info('Division ID:', [$request->division_id]);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:15',

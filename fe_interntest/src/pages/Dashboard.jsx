@@ -1,50 +1,123 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const Dashboard = () => {
-  const [data, setData] = useState(JSON.parse(localStorage.getItem('data')) || []);
-  const [page, setPage] = useState(new URLSearchParams(window.location.search).get('page') || 1);
-  const [searchTerm, setSearchTerm] = useState(new URLSearchParams(window.location.search).get('search') || '');
+  const [data, setData] = useState([]);
+  const [divisions, setDivisions] = useState([]); 
+  const [page, setPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newAge, setNewAge] = useState('');
-  const [newAddress, setNewAddress] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newPosition, setNewPosition] = useState('');
+  const [newDivisionId, setNewDivisionId] = useState('');
+  const [newImage, setNewImage] = useState(null);
   const [editIndex, setEditIndex] = useState(null);
 
+  const token = localStorage.getItem('token');
+
   useEffect(() => {
-    const params = new URLSearchParams();
-    params.set('page', page);
-    params.set('search', searchTerm);
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    fetchEmployees();
+    fetchDivisions(); 
   }, [page, searchTerm]);
 
-  const handleSave = () => {
-    const updatedData = [...data];
-    if (editIndex !== null) {
-      updatedData[editIndex] = { name: newName, age: newAge, address: newAddress };
-      setEditIndex(null);
-    } else {
-      updatedData.push({ name: newName, age: newAge, address: newAddress });
+  const fetchEmployees = async () => {
+    try {
+      const response = await axios.get(`http://localhost:8000/api/employees`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        params: {
+          page,
+          search: searchTerm
+        }
+      });
+      if (response.data.status === 'success') {
+        setData(response.data.data.employees);
+      }
+    } catch (error) {
+      console.error("Error fetching employees:", error);
     }
-    setData(updatedData);
-    localStorage.setItem('data', JSON.stringify(updatedData));
-    setIsModalOpen(false);
-    setNewName('');
-    setNewAge('');
-    setNewAddress('');
+  };
+
+  const fetchDivisions = async () => {
+    try {
+      const response = await axios.get('http://localhost:8000/api/divisions', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (response.data.status === 'success') {
+        setDivisions(response.data.data.divisions);
+      }
+    } catch (error) {
+      console.error("Error fetching divisions:", error);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      const formData = new FormData();
+      formData.append('name', newName);
+      formData.append('phone', newPhone);
+      formData.append('position', newPosition);
+      formData.append('division_id', newDivisionId);
+      if (newImage) formData.append('image', newImage);
+
+      const url = editIndex !== null
+        ? `http://localhost:8000/api/employees/${data[editIndex].id_employee}`
+        : 'http://localhost:8000/api/employees';
+
+      const method = editIndex !== null ? 'post' : 'post';
+
+      const response = await axios({
+        method: method,
+        url: url,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        },
+        data: formData
+      });
+
+      if (response.data.status === 'success') {
+        fetchEmployees();
+        setIsModalOpen(false);
+        setNewName('');
+        setNewPhone('');
+        setNewPosition('');
+        setNewDivisionId('');
+        setNewImage(null);
+        setEditIndex(null);
+      }
+    } catch (error) {
+      console.error("Error saving employee data:", error);
+    }
   };
 
   const handleEdit = (index) => {
     setEditIndex(index);
     setNewName(data[index].name);
-    setNewAge(data[index].age);
-    setNewAddress(data[index].address);
+    setNewPhone(data[index].phone);
+    setNewPosition(data[index].position);
+    setNewDivisionId(data[index].division.id_division);
     setIsModalOpen(true);
   };
 
-  const handleDelete = (index) => {
-    const updatedData = data.filter((_, i) => i !== index);
-    setData(updatedData);
-    localStorage.setItem('data', JSON.stringify(updatedData));
+  const handleDelete = async (id_employee) => {
+    try {
+      const response = await axios.delete(`http://localhost:8000/api/employees/${id_employee}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (response.data.status === 'success') {
+        fetchEmployees();
+      }
+    } catch (error) {
+      console.error("Error deleting employee:", error);
+    }
   };
 
   const filteredData = data.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -75,35 +148,25 @@ const Dashboard = () => {
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
           <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
             <tr>
-              <th className="p-4">
-                <div className="flex items-center">
-                  <input id="checkbox-all-search" type="checkbox" className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" />
-                  <label htmlFor="checkbox-all-search" className="sr-only">checkbox</label>
-                </div>
-              </th>
+              <th scope="col" className="px-6 py-3">No</th>
               <th scope="col" className="px-6 py-3">Name</th>
-              <th scope="col" className="px-6 py-3">Umur</th>
-              <th scope="col" className="px-6 py-3">Alamat</th>
+              <th scope="col" className="px-6 py-3">Phone</th>
+              <th scope="col" className="px-6 py-3">Position</th>
+              <th scope="col" className="px-6 py-3">Division</th>
               <th scope="col" className="px-6 py-3">Action</th>
             </tr>
           </thead>
           <tbody>
-            {filteredData.slice((page - 1) * 10, page * 10).map((item, index) => (
+            {filteredData.map((item, index) => (
               <tr key={index} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                <td className="w-4 p-4">
-                  <div className="flex items-center">
-                    <input id={`checkbox-table-search-${index}`} type="checkbox" className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" />
-                    <label htmlFor={`checkbox-table-search-${index}`} className="sr-only">checkbox</label>
-                  </div>
-                </td>
-                <th scope="row" className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                  {item.name}
-                </th>
-                <td className="px-6 py-4">{item.age}</td>
-                <td className="px-6 py-4">{item.address}</td>
+                <td className="px-6 py-4">{index + 1}</td>
+                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{item.name}</td>
+                <td className="px-6 py-4">{item.phone}</td>
+                <td className="px-6 py-4">{item.position}</td>
+                <td className="px-6 py-4">{item.division.name}</td>
                 <td className="px-6 py-4">
                   <button onClick={() => handleEdit(index)} className="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</button>
-                  <button onClick={() => handleDelete(index)} className="font-medium text-red-600 dark:text-red-500 hover:underline ml-2">Delete</button>
+                  <button onClick={() => handleDelete(item.id_employee)} className="font-medium text-red-600 dark:text-red-500 hover:underline ml-2">Delete</button>
                 </td>
               </tr>
             ))}
@@ -124,17 +187,32 @@ const Dashboard = () => {
               className="w-full mb-4 p-3 rounded-full border shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-300 dark:bg-gray-700 dark:text-white"
             />
             <input 
-              type="number"
-              value={newAge}
-              onChange={(e) => setNewAge(e.target.value)}
-              placeholder="Age"
+              type="text"
+              value={newPhone}
+              onChange={(e) => setNewPhone(e.target.value)}
+              placeholder="Phone"
               className="w-full mb-4 p-3 rounded-full border shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-300 dark:bg-gray-700 dark:text-white"
             />
             <input 
               type="text"
-              value={newAddress}
-              onChange={(e) => setNewAddress(e.target.value)}
-              placeholder="Address"
+              value={newPosition}
+              onChange={(e) => setNewPosition(e.target.value)}
+              placeholder="Position"
+              className="w-full mb-4 p-3 rounded-full border shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-300 dark:bg-gray-700 dark:text-white"
+            />
+            <select
+              value={newDivisionId}
+              onChange={(e) => setNewDivisionId(e.target.value)}
+              className="w-full mb-4 p-3 rounded-full border shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-300 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="">Select Division</option>
+              {divisions.map(division => (
+                <option key={division.id_division} value={division.id_division}>{division.name}</option>
+              ))}
+            </select>
+            <input 
+              type="file"
+              onChange={(e) => setNewImage(e.target.files[0])}
               className="w-full mb-4 p-3 rounded-full border shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-300 dark:bg-gray-700 dark:text-white"
             />
             <div className="flex justify-end space-x-4">

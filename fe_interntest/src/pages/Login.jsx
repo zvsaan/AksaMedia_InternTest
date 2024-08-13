@@ -7,11 +7,25 @@ const Login = ({ setIsAuthenticated }) => {
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (username === 'admin' && password === 'Admin#1234') {
+    const response = await fetch('http://localhost:8000/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username,
+        password
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('username', username);
+      localStorage.setItem('token', data.data.token);
       setIsAuthenticated(true);
       navigate('/dashboard');
     } else {
